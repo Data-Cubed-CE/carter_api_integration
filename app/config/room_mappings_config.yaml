@@ -1,0 +1,1033 @@
+# Room Mappings Configuration
+# Unified configuration for room data standardization across all providers
+# Version: 1.0
+# Last Updated: 2025-07-28
+
+# Standard Room Data Schema
+# Based on Rate Hawk structure - these are our core standardized columns
+standard_schema:
+  # Hotel identification
+  reference_id: "string"        # Universal hotel reference
+  ref_hotel_name: "string"      # Standardized hotel name
+  hotel_id: "string"            # Provider-specific hotel ID
+  hotel_name: "string"          # Original hotel name from provider
+  
+  # Room identification  
+  room_name: "string"           # Original room name from provider
+  main_name: "string"           # Normalized/standardized room name
+  
+  # Room capacity & structure
+  bedrooms_count: "integer"     # Number of bedrooms (0 if not specified)
+  room_capacity: "integer"      # Maximum guest capacity
+  room_area_m2: "float"         # Room area in square meters (0.0 if not specified)
+  room_area_sqft: "float"       # Room area in square feet (0.0 if not specified)
+  
+  # Room quality & classification
+  room_quality: "string"        # Quality level (undefined, classic, comfort, grand, etc.)
+  room_quality_category: "string"  # Grouped quality category (ultimate, luxury, very_high, high, enhanced, entry, undefined)
+  room_class: "string"          # Class (room, suite, villa, junior suite, etc.)
+  
+  # Bedding configuration
+  bedding_type: "string"        # Original bedding description
+  bedding_config: "string"      # Standardized config (single, double, twin, etc.)
+  
+  # Room features (boolean: 0/1)
+  balcony: "integer"            # Has balcony (0=no, 1=yes)
+  family_room: "integer"        # Family-friendly room (0=no, 1=yes)
+  club_room: "integer"          # Club/executive level (0=no, 1=yes)
+  
+  # View & location
+  room_view: "string"           # Standardized view type
+  
+  # Keywords & unique identifiers
+  room_keywords: "string"       # Unique keywords extracted from room name
+
+# Provider Data Sources
+# Defines what data we can reliably extract from each provider
+provider_data_sources:
+  
+  rate_hawk:
+    # Rate Hawk provides structured data - we can use direct field mapping
+    data_source: "structured_fields"
+    reliable_fields:
+      - "room_name"
+      - "bedding_type"
+      - "room_class"
+      - "room_quality"
+      - "room_capacity"
+      - "bedrooms_count"
+      - "balcony"
+      - "family_room"
+      - "club_room"
+      - "room_view"
+    
+  goglobal:
+    # GoGlobal: ONLY room_name is reliable - everything else must be parsed
+    data_source: "room_name_parsing"
+    reliable_fields:
+      - "room_name"  # Only this field contains correct data
+    parse_from_room_name:
+      - "bedrooms_count"
+      - "room_capacity"
+      - "room_quality"
+      - "room_class"
+      - "bedding_config"
+      - "balcony"
+      - "family_room"
+      - "club_room"
+      - "room_view"
+    
+  tbo:
+    # TBO: To be determined after analysis
+    data_source: "to_be_analyzed"
+
+# Room Name Cleaning Patterns
+# Patterns for creating clean main_name from room_name
+# Remove promotional text, booking conditions, etc.
+room_name_cleaning:
+  # Elements to remove (in order of processing)
+  remove_patterns:
+    - pattern: '\([^)]*\)'        # Remove anything in parentheses: (Special Offer)
+      description: "Remove content in parentheses"
+    - pattern: '\[[^\]]*\]'       # Remove anything in square brackets: [Non-Refundable]
+      description: "Remove content in square brackets"
+    - pattern: '\{[^}]*\}'        # Remove anything in curly brackets: {Package Deal}
+      description: "Remove content in curly brackets"
+    - pattern: '- .*$'            # Remove everything after dash at end: "Room - Special Rate"
+      description: "Remove trailing dash content"
+    - pattern: '\s+\|\s+.*$'      # Remove everything after pipe: "Room | Promotion"
+      description: "Remove pipe-separated content"
+    - pattern: '\s*\*.*$'         # Remove everything after asterisk: "Room *Terms apply"
+      description: "Remove asterisk content"
+  
+  # Additional cleanup
+  final_cleanup:
+    - pattern: '\s{2,}'           # Replace multiple spaces with single space
+      replacement: ' '
+    - pattern: '^\s+|\s+$'        # Trim leading/trailing whitespace
+      replacement: ''
+    
+    # Bedroom normalization - treat "bedrooms" and "bedroom" equally
+    - pattern: '\b(\d+)\s+bedrooms\b'  # "2 bedrooms" -> "2 bedroom"
+      replacement: '\1 bedroom'
+      description: "Normalize bedrooms to bedroom (with numbers)"
+    - pattern: '\b(one|two|three|four|five|six|seven|eight|nine|ten)\s+bedrooms\b'  # "two bedrooms" -> "two bedroom"
+      replacement: '\1 bedroom'
+      description: "Normalize bedrooms to bedroom (with text numbers)"
+
+
+# Room Name Parsing Patterns
+# Regular expressions and keywords for extracting data from room names
+# Used primarily for GoGlobal where only room_name is reliable
+parsing_patterns:
+  
+  # Bedroom count extraction
+  bedrooms_count:
+    case_insensitive: true  # Applies to all patterns in this section
+    patterns:
+      # Digit patterns with spaces
+      - pattern: '(\d+)\s+bedroom'
+        group: 1
+      - pattern: '(\d+)\s+bedrooms'
+        group: 1
+      # Digit patterns without spaces  
+      - pattern: '(\d+)bedroom'
+        group: 1
+      - pattern: '(\d+)bedrooms'
+        group: 1
+      # Digit patterns with hyphens
+      - pattern: '(\d+)-bedroom'
+        group: 1
+      - pattern: '(\d+)-bedrooms'
+        group: 1
+      # Text number patterns (most common)
+      - pattern: '\bone\s+bedroom'
+        value: 1
+      - pattern: '\btwo\s+bedroom'
+        value: 2
+      - pattern: '\bthree\s+bedroom'
+        value: 3
+      - pattern: '\bfour\s+bedroom'
+        value: 4
+      - pattern: '\bfive\s+bedroom'
+        value: 5
+      - pattern: '\bsix\s+bedroom'
+        value: 6
+      # Text number patterns with 's'
+      - pattern: '\bone\s+bedrooms'
+        value: 1
+      - pattern: '\btwo\s+bedrooms'
+        value: 2
+      - pattern: '\bthree\s+bedrooms'
+        value: 3
+      - pattern: '\bfour\s+bedrooms'
+        value: 4
+      - pattern: '\bfive\s+bedrooms'
+        value: 5
+      - pattern: '\bsix\s+bedrooms'
+        value: 6
+    default: null  # No bedrooms count found
+    
+  # Room area extraction
+  room_area:
+    case_insensitive: true  # Applies to all patterns in this section
+    patterns:
+      # Square feet patterns
+      - pattern: '(\d+)\s+sq\s+ft'
+        group: 1
+        unit: 'sq_ft'
+      - pattern: '(\d+)\s*sq\s*ft'
+        group: 1
+        unit: 'sq_ft'
+      - pattern: '(\d+)\s*sqft'
+        group: 1
+        unit: 'sq_ft'
+      # Square meters patterns  
+      - pattern: '(\d+)\s+sqm'
+        group: 1
+        unit: 'm2'
+      - pattern: '(\d+)\s*sqm'
+        group: 1
+        unit: 'm2'
+      - pattern: '(\d+)\s*m2'
+        group: 1
+        unit: 'm2'
+      - pattern: '(\d+)\s*m²'
+        group: 1
+        unit: 'm2'
+      - pattern: '(\d+)\s*square\s*meters'
+        group: 1
+        unit: 'm2'
+    default: null  # If no area found
+    target_unit: 'm2'  # Always convert to square meters
+    
+  # Room capacity extraction  
+  room_capacity:
+    case_insensitive: true  # Applies to all patterns in this section
+    patterns:
+      # Explicit numbers (highest priority)
+      - pattern: '(\d+)\s+person'
+        group: 1
+      - pattern: '(\d+)\s+guest'
+        group: 1
+      - pattern: '(\d+)\s+adults?'
+        group: 1
+      # Room type patterns
+      - pattern: '\bsingle\s+room\b'
+        value: 1
+      - pattern: '\bdouble\s+room\b'
+        value: 2
+      - pattern: '\btwin\s+room\b'
+        value: 2
+      - pattern: '\broom\s+twin\b'
+        value: 2
+      - pattern: '\btriple\s+room\b'
+        value: 3
+      - pattern: '\bquadruple\s+room\b'
+        value: 4
+      - pattern: '\bsingle\s+villa\b'
+        value: 1
+      - pattern: '\bdouble\s+villa\b'
+        value: 2
+      - pattern: '\btriple\s+villa\b'
+        value: 3
+      - pattern: '\bquadruple\s+villa\b'
+        value: 4
+      - pattern: '\bsingle\s+suite\b'
+        value: 1
+      - pattern: '\bdouble\s+suite\b'
+        value: 2
+      - pattern: '\btriple\s+suite\b'
+        value: 3
+      - pattern: '\bquadruple\s+suite\b'
+        value: 4
+      - pattern: '\bsingle\s+apartment\b'
+        value: 1
+      - pattern: '\bdouble\s+apartment\b'
+        value: 2
+      - pattern: '\btriple\s+apartment\b'
+        value: 3
+      - pattern: '\bquadruple\s+apartment\b'
+        value: 4
+      - pattern: '\bsingle\s+cottage\b'
+        value: 1
+      - pattern: '\bdouble\s+cottage\b'
+        value: 2
+      - pattern: '\btriple\s+cottage\b'
+        value: 3
+      - pattern: '\bquadruple\s+cottage\b'
+        value: 4
+      - pattern: '\bsingle\s+chalet\b'
+        value: 1
+      - pattern: '\bdouble\s+chalet\b'
+        value: 2
+      - pattern: '\btriple\s+chalet\b'
+        value: 3
+      - pattern: '\bquadruple\s+chalet\b'
+        value: 4
+      - pattern: '\bsingle\s+mansion\b'
+        value: 1
+      - pattern: '\bdouble\s+mansion\b'
+        value: 2
+      - pattern: '\btriple\s+mansion\b'
+        value: 3
+      - pattern: '\bquadruple\s+mansion\b'
+        value: 4
+      - pattern: '\bsingle\s+pavilion\b'
+        value: 1
+      - pattern: '\bdouble\s+pavilion\b'
+        value: 2
+      - pattern: '\btriple\s+pavilion\b'
+        value: 3
+      - pattern: '\bquadruple\s+pavilion\b'
+        value: 4
+      - pattern: 'quadruple'
+        value: 4
+      - pattern: '\btriple\b'
+        value: 3
+      - pattern: '\bquadruple\b'
+        value: 4
+      - pattern: '\bquad\b'
+        value: 4
+      - pattern: '\bquintuple\b'
+        value: 5
+      - pattern: '\bsextuple\b'
+        value: 6
+      # Numbered room patterns
+      - pattern: '(\d+)\s+double\s+room'
+        group: 1
+      - pattern: '(\d+)\s+single\s+room'
+        group: 1
+      - pattern: '(\d+)\s+twin\s+room'
+        group: 1
+      - pattern: 'room\\s*-\\s*twin'
+        value: 2
+    default: null # No default capacity - only use explicit patterns
+    
+  # Room class extraction (architectural types only)
+  room_class:
+    case_insensitive: true  # Applies to all keywords in this section
+    keywords:
+      # Suites
+      "suite": "suite"
+      
+      # Architectural types
+      "penthouse": "penthouse"
+      "villa": "villa"
+      "cottage": "cottage"
+      "chalet": "chalet"
+      "mansion": "mansion"
+      "pavilion": "pavilion"
+      "bungalow": "bungalow"
+      "residence": "residence"
+      "duplex": "duplex"
+      "studio": "studio"
+      "apartment": "apartment"
+      
+      # Standard room (default)
+      "room": "room"
+    default: "other"
+    
+  # Room quality extraction (detailed qualifiers)
+  room_quality:
+    case_insensitive: true  # Applies to all keywords in this section
+    keywords:
+      # Detailed quality modifiers (ungrouped)
+      "presidential": "presidential"
+      "signature": "signature"
+      "prestige": "prestige"
+      "premier": "premier"
+      "luxury": "luxury"
+      "grand": "grand"
+      "royal": "royal"
+      "imperial": "imperial"
+      "palace": "palace"
+      "regal": "regal"
+      "exclusive": "exclusive"
+      "supreme": "supreme"
+      "club": "club"
+      "executive": "executive"
+      "deluxe": "deluxe"
+      "premium": "premium"
+      "superior": "superior"
+      "standard": "standard"
+      "classic": "classic"
+      "comfort": "comfort"
+      "junior": "junior"
+      "basic": "basic"
+      "regular": "regular"
+    default: null
+    
+  # Room quality category extraction (grouped categories)
+  room_quality_category:
+    case_insensitive: true  # Applies to all keywords in this section
+    keywords:
+      # Ultimate Level (Poziom Najwyższy)
+      "presidential": "ultimate"
+      "signature": "ultimate"
+      "prestige": "ultimate"
+      
+      # Luxury Level (Poziom Luksusowy)
+      "premier": "luxury"
+      "luxury": "luxury"
+      "grand": "luxury"
+      "royal": "luxury"
+      "imperial": "luxury"
+      "palace": "luxury"
+      "regal": "luxury"
+      "exclusive": "luxury"
+      "supreme": "luxury"
+      
+      # Very High Level (Poziom Bardzo Wysoki)
+      "club": "very_high"
+      "executive": "very_high"
+      
+      # High Level (Poziom Wysoki)
+      "deluxe": "high"
+      "premium": "high"
+      
+      # Enhanced Level (Poziom Podwyższony)
+      "superior": "enhanced"
+      
+      # Entry Level (Poziom Podstawowy)
+      "standard": "entry"
+      "classic": "entry"
+      "comfort": "entry"
+      "junior": "entry"  # Junior suites are entry-level
+      "basic": "entry"
+      "regular": "entry"
+    default: null
+    
+  # Bedding configuration extraction
+  bedding_config:
+    case_insensitive: true  # Applies to all keywords in this section
+    
+    # Multiple bed types in one room = "multiple"
+    multiple_bed_patterns:
+      - pattern: '\b(?:king|queen|double|twin|single).*?\b(?:and|&|\+).*?\b(?:king|queen|double|twin|single)\b'
+        value: "multiple"
+        description: "Multiple different bed types (e.g., king and twin)"
+      - pattern: '\bking.*?single\b'
+        value: "multiple"
+        description: "King and single bed combination"
+      - pattern: '\bking.*?twin\b'
+        value: "multiple"
+        description: "King and twin bed combination"
+      - pattern: '\bqueen.*?single\b'
+        value: "multiple"
+        description: "Queen and single bed combination"
+      - pattern: '\bdouble.*?single\b'
+        value: "multiple"
+        description: "Double and single bed combination"
+        
+    keywords:
+      # Multiple bed configurations (checked after multiple_bed_patterns)
+      "2 queen beds": "queens"
+      "two queen beds": "queens"
+      "2 twin beds": "twins"
+      "two twin beds": "twins"
+      "2 double beds": "doubles"
+      "two double beds": "doubles"
+      "3 twin beds": "twins"
+      "three twin beds": "twins"
+      "3 single beds": "singles"
+      "three single beds": "singles"
+      "4 twin beds": "twins"
+      "four twin beds": "twins"
+      "4 single beds": "singles"
+      "four single beds": "singles"
+      "double double": "doubles"
+      "2 queen beds": "queens"
+      "two queen beds": "queens"
+      "2 twin beds": "twins"
+      "two twin beds": "twins"
+      "2 double beds": "doubles"
+      "two double beds": "doubles"
+      "3 twin beds": "twins"
+      "three twin beds": "twins"
+      "3 single beds": "singles"
+      "three single beds": "singles"
+      "4 twin beds": "twins"
+      "four twin beds": "twins"
+      "4 single beds": "singles"
+      "four single beds": "singles"
+      "double double": "doubles"
+      
+      # Single bed configurations (most specific first)
+      "1 king bed": "king"
+      "one king bed": "king"
+      "king size bed": "king"
+      "king bed": "king"
+      "king": "king"
+      
+      # Queen bed configurations
+      "1 queen bed": "queen"
+      "one queen bed": "queen"
+      "queen size bed": "queen"
+      "queen bed": "queen"
+      "queen": "queen"
+      
+      # Double bed configurations (most specific first)
+      "full double bed": "double"
+      "1 double bed": "double"
+      "one double bed": "double"
+      "double bed": "double"
+      
+      # Twin bed configurations (most specific first)
+      "twin size beds": "twins"
+      "twin beds": "twins"
+      "1 twin bed": "twin"
+      "one twin bed": "twin"
+      "twin bed": "twin"
+      "twin": "twin"
+      
+      # Single bed configurations (most specific first)
+      "1 single bed": "single"
+      "one single bed": "single"
+      "single bed": "single"
+      
+      # Special bed types
+      "sofa bed": "sofa"
+      "sofa beds": "sofas"
+      "bunk bed": "bunk"
+      "bunk beds": "bunks"
+      "murphy bed": "murphy"
+      "murphy beds": "murphys"
+      "pull out bed": "pullout"
+      "pull out beds": "pullouts"
+    default: null
+    
+  # Room view extraction (in order of priority)
+  room_view:
+    case_insensitive: true  # Applies to all keywords in this section
+    keywords:
+      # Ocean Views (highest priority - premium views)
+      "ocean view": "ocean_view"
+      "oceanview": "ocean_view"
+      "ocean vw": "ocean_view"
+      "oceanvw": "ocean_view"
+      "ov": "ocean_view"
+      "partial ov": "ocean_view"
+      "partial ocean view": "ocean_view"
+      "partial ocean": "ocean_view"
+      
+      # Sea Views (highest priority - premium views)
+      "ionian sea view": "sea_view"
+      "sea front": "sea_view"
+      "seafront": "sea_view"
+      "sea view": "sea_view"
+      "seaview": "sea_view"
+      "ionian view": "sea_view"
+      "water view": "sea_view"
+      
+      # Beach Views (highest priority - premium views)
+      "beach view": "beach_view"
+      "beachview": "beach_view"
+      "beach front": "beach_view"
+      "beachfront": "beach_view"
+
+      # Lake View
+
+      "lake": "lake_view"
+      "lake view": "lake_view"
+      
+      # Bay and Harbor Views (very high priority)
+      "benitses bay view": "bay_view"
+      "bay view": "bay_view"
+      "harbour view": "bay_view"
+      "harbor view": "bay_view"
+      "harbour bridge": "bay_view"
+      "harbor bridge": "bay_view"
+      "marina view": "bay_view"
+      "lagoon view": "bay_view"
+      
+      # Pool Views (high priority for resort hotels)
+      "pool view": "pool_view"
+      "pool side": "pool_view"
+      "poolside": "pool_view"
+      
+      # City and Urban Views (medium priority)
+      "city view": "city_view"
+      "cityview": "city_view"
+      "urban view": "city_view"
+      "street view": "city_view"
+      "skyline view": "city_view"
+      "atrium view": "city_view"
+      
+      # Garden and Nature Views (medium priority)
+      "woodland view": "woodland_view"
+      "woodland": "woodland_view"
+      "garden view": "garden_view"
+      "garden": "garden_view"
+      "park view": "garden_view"
+      "mountain view": "mountain_view"
+      
+      # Sky Views (medium priority)
+      "sky view": "sky_view"
+      "skyview": "sky_view"
+      "sky": "sky_view"
+      "project view": "limited_view"  # Usually construction/temporary
+      
+      # Limited and Partial Views (low priority)
+      "partial view": "limited_view"
+      "limited view": "limited_view"
+      "restricted view": "limited_view"
+      "project view": "limited_view"  # Usually construction/temporary
+    default: null
+    
+  # Boolean features extraction
+  boolean_features:
+    case_insensitive: true  # Applies to all keywords in this section
+    balcony:
+      keywords: ["balcony", "balconies", "terrace", "terraces", "patio", "patios", "veranda", "verandas", "furnished balcony", "private balcony", "with balcony"]
+      default: null
+    family_room:
+      keywords: ["family", "murphy wall beds", "bunk", "connecting", "connected", "kids", "children", "child", "family room", "family suite", "2 adults +", "adults +"]
+      default: null
+    club_room:
+      keywords: ["club room", "club suite", "executive room", "executive suite", "concierge room", "concierge suite", "club level", "executive level"]
+      default: null
+  
+  # Room keywords extraction
+  # Extract unique keywords that are not captured by other attributes
+  room_keywords:
+    case_insensitive: true
+    
+    # Automatically exclude words from these config sections
+    exclude_from_sections:
+      - "parsing_patterns.room_class.keywords"           # room_class -> keywords
+      - "parsing_patterns.room_quality.keywords"         # room_quality -> keywords  
+      - "parsing_patterns.room_view.keywords"            # room_view -> keywords
+      - "parsing_patterns.bedding_config.keywords"       # bedding_config -> keywords
+      - "parsing_patterns.boolean_features.balcony.keywords"      # boolean_features -> balcony -> keywords
+      - "parsing_patterns.boolean_features.family_room.keywords"  # boolean_features -> family_room -> keywords
+      - "parsing_patterns.boolean_features.club_room.keywords"    # boolean_features -> club_room -> keywords
+    
+    # Additional common words to exclude (not in other sections)
+    exclude_words:
+      - "with"
+      - "and" 
+      - "the"
+      - "a"
+      - "an"
+      - "of"
+      - "in"
+      - "on"
+      - "at"
+      - "for"
+      - "to"
+      - "by"
+      - "from"
+      - "up"
+      - "about"
+      - "into"
+      - "through"
+      - "during"
+      - "before"
+      - "after"
+      - "above"
+      - "below"
+      - "between"
+      - "among"
+      - "private"
+      - "special"
+      - "new"
+      - "old"
+      - "large"
+      - "small"
+      - "big"
+      - "little"
+      - "good"
+      - "great"
+      - "best"
+      - "beautiful"
+      - "nice"
+      - "perfect"
+      - "bed"
+      - "beds"
+      - "room"
+      - "rooms"
+      - "view"
+      - "views"
+      - "ocean"
+      - "sea"
+      - "beach"
+      - "bay"
+      - "lake"
+      - "pool"
+      - "garden"
+      - "mountain"
+      - "city"
+      - "sky"
+      - "panoramic"
+      - "woodland"
+      - "harbor"
+      - "harbour"
+      - "partial"
+      - "front"
+      - "side"
+      - "full"
+      - "quadruple"
+      - "sextuple"
+      - "skyline"
+      - "bedroom"
+      - "bedrooms"
+      - "breaksfast"
+      - "included"
+      - "includes"
+      - "include"
+      - "price"
+      - "food"
+      
+    # Minimum word length to consider
+    min_word_length: 3
+    
+    # Maximum number of keywords to extract
+    max_keywords: 5
+    
+    # Words that should always be included (even if in exclude list)
+    force_include:
+      - "gemsstock"
+      - "gotthard"
+      - "presidential"
+      - "royal"
+      - "imperial"
+      - "signature"
+      - "collection"
+      - "reserve"
+      - "premier"
+      - "preferred"
+      - "prestige"
+      - "platinum"
+      - "gold"
+      - "silver"
+      - "diamond"
+      - "pearl"
+      - "emerald"
+      - "sapphire"
+      - "ruby"
+      - "crystal"
+      
+    default: null
+
+# Basic Standardization Dictionaries
+# Built based on Rate Hawk and GoGlobal data analysis
+
+# Room Class Standardization
+room_class_mappings:
+  room:
+    aliases: ["room", "standard room", "guest room", "hotel room"]
+    numeric_values: [3]  # GoGlobal uses 3 for standard rooms
+    category: "standard"
+    
+  suite:
+    aliases: ["suite", "junior suite", "senior suite", "pool suite", "garden suite", "ocean suite", "sea suite", "presidential suite", "executive suite", "deluxe suite", "premium suite", "luxury suite"]
+    numeric_values: [5]  # GoGlobal uses 5 for suites
+    category: "suite"
+    
+  villa:
+    aliases: ["villa", "private villa", "pool villa", "garden villa", "beachfront villa", "ocean villa", "sea villa", "beach villa"]
+    numeric_values: [7]  # If GoGlobal uses 7 for villas
+    category: "villa"
+    
+  cottage:
+    aliases: ["cottage", "pool cottage", "garden cottage", "beach cottage"]
+    numeric_values: [6]  # If GoGlobal uses 6 for cottages
+    category: "cottage"
+    
+  chalet:
+    aliases: ["chalet", "pool chalet", "mountain chalet", "ski chalet"]
+    numeric_values: [6]  # If GoGlobal uses 6 for chalets
+    category: "chalet"
+    
+  mansion:
+    aliases: ["mansion", "luxury mansion", "private mansion"]
+    numeric_values: [8]  # If GoGlobal uses 8 for mansions
+    category: "mansion"
+    
+  pavilion:
+    aliases: ["pavilion", "garden pavilion", "pool pavilion", "beach pavilion"]
+    numeric_values: [6]  # If GoGlobal uses 6 for pavilions
+    category: "pavilion"
+    
+  apartment:
+    aliases: ["apartment", "aparthotel", "studio"]
+    numeric_values: [4]  # If GoGlobal uses 4 for apartments
+    category: "apartment"
+
+# Room Quality Standardization  
+room_quality_mappings:
+  undefined:
+    aliases: ["undefined", "", "unknown", "not specified"]
+    numeric_values: [0]
+    score: 0
+    
+  classic:
+    aliases: ["classic", "standard", "basic", "regular"]
+    numeric_values: [3, 4]  # GoGlobal uses 3,4 for basic quality
+    score: 1
+    
+  comfort:
+    aliases: ["comfort", "superior", "enhanced", "upgraded"]
+    numeric_values: [5, 6]  # GoGlobal uses 5,6 for better quality
+    score: 2
+    
+  grand:
+    aliases: ["grand", "deluxe", "premium", "luxury"]
+    numeric_values: [7, 8, 9]  # GoGlobal uses 7,8,9 for high quality
+    score: 3
+
+# Bedding Configuration Standardization
+bedding_config_mappings:
+  single:
+    aliases: ["single"]
+    capacity: 1
+    
+  double:
+    aliases: ["double"]
+    capacity: 2
+    
+  twin:
+    aliases: ["twin"]
+    capacity: 2
+    
+  king:
+    aliases: ["king"]
+    capacity: 2
+    
+  queen:
+    aliases: ["queen"]
+    capacity: 2
+    
+  queens:
+    aliases: ["queens"]
+    capacity: 4
+    description: "Multiple queen beds"
+    
+  twins:
+    aliases: ["twins"]
+    capacity: 4
+    description: "Multiple twin beds"
+    
+  doubles:
+    aliases: ["doubles"]
+    capacity: 4
+    description: "Multiple double beds"
+    
+  singles:
+    aliases: ["singles"]
+    capacity: 3
+    description: "Multiple single beds"
+    
+  multiple:
+    aliases: ["multiple"]
+    capacity: 4
+    description: "Mixed bed types or complex configurations"
+    
+  sofa:
+    aliases: ["sofa"]
+    capacity: 1
+    
+  sofas:
+    aliases: ["sofas"]
+    capacity: 2
+    description: "Multiple sofa beds"
+    
+  bunk:
+    aliases: ["bunk"]
+    capacity: 2
+    
+  bunks:
+    aliases: ["bunks"]
+    capacity: 4
+    description: "Multiple bunk beds"
+    
+  murphy:
+    aliases: ["murphy"]
+    capacity: 2
+    description: "Murphy/wall bed"
+    
+  murphys:
+    aliases: ["murphys"]
+    capacity: 4
+    description: "Multiple murphy beds"
+    
+  pullout:
+    aliases: ["pullout"]
+    capacity: 2
+    description: "Pull-out bed"
+    
+  pullouts:
+    aliases: ["pullouts"]
+    capacity: 4
+    description: "Multiple pull-out beds"
+    
+  undefined:
+    aliases: ["undefined", "", "unknown", "not specified"]
+    capacity: 0
+
+# Room View Standardization
+room_view_mappings:
+  ocean_view:
+    aliases: ["ocean view", "oceanview", "ocean vw", "oceanvw", "ov", "partial ov", "partial ocean view", "partial ocean"]
+    priority: 11
+    description: "Ocean views including abbreviated forms"
+    
+  sea_view:
+    aliases: ["sea view", "seaview", "ionian sea view", "water view", "sea front", "seafront", "ionian view"]
+    priority: 10
+    description: "Sea and water views"
+    
+  beach_view:
+    aliases: ["beach view", "beachview", "beach front", "beachfront"]
+    priority: 9
+    description: "Beach and beachfront views"
+    
+  bay_view:
+    aliases: ["bay view", "harbour view", "harbor view", "marina view", "lagoon view", "benitses bay view", "harbour bridge", "harbor bridge"]
+    priority: 8
+    description: "Bay, harbor, marina, and lagoon views"
+
+  lake_view:
+    aliases: ["lake view", "lake"]
+    priority: 7
+    description: "Lake views"
+    
+  pool_view:
+    aliases: ["pool view", "pool side", "poolside"]
+    priority: 6
+    description: "Swimming pool views"
+    
+  panoramic_view:
+    aliases: ["panoramic view", "view room"]
+    priority: 5
+    description: "Panoramic and general premium views"
+    
+  sky_view:
+    aliases: ["sky view", "skyview", "sky", "skyline view", "skyline"]
+    priority: 5
+    description: "Sky and aerial views"
+    
+  mountain_view:
+    aliases: ["mountain view"]
+    priority: 4
+    description: "Mountain and hill views"
+    
+  garden_view:
+    aliases: ["garden view", "park view"]
+    priority: 3
+    description: "Garden, park, and nature views"
+    
+  woodland_view:
+    aliases: ["woodland view", "woodland", "achilleion woodland view"]
+    priority: 3
+    description: "Woodland and forest views"
+    
+  city_view:
+    aliases: ["city view", "cityview", "urban view", "street view", "atrium view"]
+    priority: 2
+    description: "City, urban, and architectural views"
+    
+  limited_view:
+    aliases: ["limited view", "partial view", "restricted view", "project view"]
+    priority: 1
+    description: "Limited, partial, or obstructed views"
+
+
+# Room Mapping Configuration
+# Controls how rooms are matched between different providers
+room_mapping_config:
+  
+  # Raw data sources (input for standardization)
+  raw_input_files:
+    ratehawk: "app/data/01_api_rate_hawk_rooms.csv"
+    goglobal: "app/data/02_api_goglobal_rooms.csv"
+    tbo: "app/data/03_api_tbo_rooms.csv"
+  
+  # Data sources for mapping (output from standardization)
+  input_files:
+    ratehawk: "app/data/01_api_rate_hawk_rooms_STANDARDIZED.csv"
+    goglobal: "app/data/02_api_goglobal_rooms_STANDARDIZED.csv"
+    tbo: "app/data/03_api_tbo_rooms_STANDARDIZED.csv"
+  
+  # Output configuration
+  output_files:
+    mapped_rooms: "app/data/room_mappings_result.csv"
+    mapping_log: "app/data/room_mapping_log.txt"
+    
+  # Columns to ignore during mapping
+  # These columns are provider-specific and not used for matching
+  ignored_columns:
+    - "reference_id"
+    - "ref_hotel_name" 
+    - "hotel_id"
+    - "hotel_name"
+    - "room_name"
+    
+  # Exact match columns (must be identical)
+  # All columns except main_name require exact matching
+  # NOTE: bedding_type removed - handled by calculate_bedroom_compatibility() with tolerance
+  exact_match_columns:
+    - "bedrooms_count"
+    - "room_capacity" 
+    - "room_quality"
+    - "room_quality_category"
+    - "room_class"
+    # - "bedding_type"      # REMOVED: Now handled with tolerance in bedroom_compatibility
+    # - "bedding_config"    # REMOVED: Now handled with tolerance in bedroom_compatibility
+    - "balcony"
+    - "family_room"
+    - "club_room"
+    - "room_view"
+    - "room_area_m2"
+    - "room_area_sqft"
+    
+  # Fuzzy match configuration for main_name
+  fuzzy_matching:
+    # Column to apply fuzzy matching
+    target_column: "main_name"
+    
+    # Matching thresholds
+    thresholds:
+      perfect_match: 1.0        # 100% identical strings
+      word_order_match: 1.0    # Same words, different order  
+      similarity_threshold: 0.70 # Minimum similarity for fuzzy match
+      
+    # Matching algorithm priorities (in order)
+    algorithms:
+      - name: "exact_match"
+        weight: 1.0
+        description: "Perfect string match"
+        
+      - name: "word_order_match"  
+        weight: 1.0
+        description: "Same words, different order"
+        
+      - name: "fuzzy_ratio"
+        weight: 0.7
+        description: "Overall string similarity"
+        
+      - name: "token_sort_ratio"
+        weight: 0.8
+        description: "Token-based sorted comparison"
+        
+      - name: "token_set_ratio"
+        weight: 0.75
+        description: "Set-based token comparison"
+        
+  # Simplified matching - no scoring, just exact match + fuzzy main_name
+  # All exact_match_columns must be identical, main_name uses fuzzy matching
+  
+  # Hotel matching strategy
+  hotel_matching:
+    # Must match hotel names between providers
+    require_hotel_match: true
+    
+    # Hotel name similarity threshold
+    hotel_name_threshold: 0.85
+    
+    # Hotel matching algorithms
+    hotel_algorithms:
+      - "exact_match"
+      - "fuzzy_ratio"
+      - "token_sort_ratio"

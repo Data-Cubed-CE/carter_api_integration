@@ -1,0 +1,31 @@
+# Azure Functions Python Dependencies
+azure-functions>=1.18.0
+#azure-functions-worker>=1.0.0
+
+# FastAPI and web framework
+fastapi>=0.104.0
+uvicorn>=0.24.0
+
+# HTTP client
+aiohttp>=3.9.0
+httpx>=0.25.0
+requests>=2.31.0
+
+# Data handling
+pandas>=2.1.0
+pydantic>=2.5.0
+PyYAML>=6.0.0
+
+# Environment management
+python-dotenv>=1.0.0
+
+# Logging and monitoring
+azure-monitor-opentelemetry>=1.2.0
+
+# Azure SQL Database connectivity
+pyodbc>=5.0.0
+
+# Azure authentication and identity
+azure-storage-blob>=12.19.0
+azure-identity>=1.15.0
+azure-keyvault-secrets>=4.7.0
